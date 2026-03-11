@@ -80,9 +80,9 @@ def save_cached_api_key(api_url: str, api_key: str) -> None:
 
 
 def api_key_help_url(api_url: str) -> str:
-  """Best-effort URL where the user can obtain an API key.
+  """Best-effort URL of the browsable page where the user can create an API key.
 
-  Prefer env override; otherwise strip /api/ and point to login_prompt.
+  Prefer env override HPCPERF_API_KEY_URL; otherwise strip /api/ and point to /api-key/.
   """
   override = os.environ.get("HPCPERF_API_KEY_URL")
   if override:
@@ -91,4 +91,4 @@ def api_key_help_url(api_url: str) -> str:
   if "/api/" in root:
     root = root.split("/api/", 1)[0]
   root = root.rstrip("/")
-  return root + "/login_prompt"
+  return root + "/api-key/"
