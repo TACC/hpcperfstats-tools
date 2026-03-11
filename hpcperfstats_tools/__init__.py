@@ -1,0 +1,9 @@
+"""Utility tools for interacting with an HPCPerfStats deployment.
+
+Currently provides the `jobstats` style command line client.
+"""
+
+__all__ = ["__version__"]
+
+__version__ = "0.1.0"
+
