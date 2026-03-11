@@ -66,13 +66,33 @@ def run_sacct_for_date(single_date):
 
 
 def send_to_api(base_url, api_key, date_str, body):
-    """POST sacct output to the ingest endpoint. Return (success, message)."""
+    """POST sacct output to the ingest endpoint. Return (success, message).
+
+    Some deployments may issue an HTTP redirect (for example, HTTP→HTTPS or
+    path normalization). The Python requests library may convert a POST into a
+    GET when following a 301/302 redirect, which would cause Django to return
+    "405 Method Not Allowed" on the ingest view (which only allows POST).
+
+    To avoid this, we first send the request with redirects disabled and, if
+    we receive a redirect status with a Location header, we re‑POST once to
+    the redirected URL while preserving the HTTP method and body.
+    """
     url = f"{base_url.rstrip('/')}/sacct/ingest/?date={date_str}"
     headers = {"Content-Type": "text/plain; charset=utf-8"}
     if api_key:
         headers["Authorization"] = f"Api-Key {api_key}"
+
     try:
-        r = requests.post(url, data=body, headers=headers, timeout=300)
+        # First request: do not auto-follow redirects, so we can preserve POST.
+        r = requests.post(url, data=body, headers=headers, timeout=300, allow_redirects=False)
+
+        # Handle a single explicit redirect hop while keeping POST.
+        if r.is_redirect or r.status_code in (301, 302, 303, 307, 308):
+            redirect_url = r.headers.get("Location")
+            if redirect_url:
+                # Absolute or relative Location are both supported by requests.
+                r = requests.post(redirect_url, data=body, headers=headers, timeout=300)
+
         r.raise_for_status()
         data = r.json()
         return True, data.get("inserted", 0)
