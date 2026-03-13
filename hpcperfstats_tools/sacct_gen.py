@@ -7,6 +7,7 @@ Requires API base URL in the INI file pointed to by HPCPERFSTATS_TOOLS_INI ([API
 use --api-key or a key cached in ~/.hpcperfstats-api (same scheme as jobstats_cli).
 """
 import argparse
+import os
 import subprocess
 import sys
 from datetime import datetime, timedelta
@@ -54,11 +55,14 @@ def run_sacct_for_date(single_date):
         "-E", end_str,
         "-o", SACCT_FIELDS,
     ]
+    env = os.environ.copy()
+    env["TZ"] = "UTC"
     result = subprocess.run(
         cmd,
         capture_output=True,
         text=False,
         timeout=3600,
+        env=env,
     )
     if result.returncode != 0:
         return start_str, None
