@@ -229,7 +229,11 @@ def print_jobstats(jid: str,
     for metric in other:
       value = metric.get("value")
       units = metric.get("units") or ""
-      print(f"  {metric.get('metric', ''):20s} {value!r} {units}")
+      if value is not None:
+        display = f"{value!r} {units}".strip()
+      else:
+        display = metric.get("no_data_reason") or "No data"
+      print(f"  {metric.get('metric', ''):20s} {display}")
 
   return 0
 
