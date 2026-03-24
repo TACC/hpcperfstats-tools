@@ -32,6 +32,7 @@ Both tools authenticate with an API key. Keys are created in the HPCPerfStats we
 
 - **First use:** pass the key with `--api-key`. It will be stored in `~/.hpcperfstats-api` for that API base URL.
 - **Later runs:** the cached key is used automatically, or you can pass `--api-key` again.
+- Tools send API keys via request headers (`X-API-Key`), not query-string parameters.
 
 ## Tools
 

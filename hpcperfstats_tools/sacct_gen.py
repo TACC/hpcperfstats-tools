@@ -11,11 +11,13 @@ import os
 import subprocess
 import sys
 from datetime import datetime, timedelta
+from urllib.parse import urljoin, urlparse
 from typing import Optional
 
 import requests
 from dateutil.parser import parse
 
+from .api_auth import apply_api_key_header
 from .api_key_cache import (
     API_KEY_CACHE,
     api_key_help_url,
@@ -69,6 +71,18 @@ def run_sacct_for_date(single_date):
     return start_str, result.stdout
 
 
+def _resolve_redirect_url(source_url: str, location: str) -> str:
+    """Return an absolute redirect URL from Location (absolute or relative)."""
+    return urljoin(source_url, location)
+
+
+def _is_same_origin(source_url: str, target_url: str) -> bool:
+    """True when scheme+host+port match exactly."""
+    src = urlparse(source_url)
+    dst = urlparse(target_url)
+    return (src.scheme, src.netloc) == (dst.scheme, dst.netloc)
+
+
 def send_to_api(base_url, api_key, date_str, body):
     """POST sacct output to the ingest endpoint. Return (success, message).
 
@@ -83,8 +97,7 @@ def send_to_api(base_url, api_key, date_str, body):
     """
     url = f"{base_url.rstrip('/')}/sacct/ingest/?date={date_str}"
     headers = {"Content-Type": "text/plain; charset=utf-8"}
-    if api_key:
-        headers["Authorization"] = f"Api-Key {api_key}"
+    headers = apply_api_key_header(headers, api_key)
 
     try:
         # First request: do not auto-follow redirects, so we can preserve POST.
@@ -92,9 +105,11 @@ def send_to_api(base_url, api_key, date_str, body):
 
         # Handle a single explicit redirect hop while keeping POST.
         if r.is_redirect or r.status_code in (301, 302, 303, 307, 308):
-            redirect_url = r.headers.get("Location")
-            if redirect_url:
-                # Absolute or relative Location are both supported by requests.
+            redirect_location = r.headers.get("Location")
+            if redirect_location:
+                redirect_url = _resolve_redirect_url(url, redirect_location)
+                if not _is_same_origin(url, redirect_url):
+                    return False, f"Cross-origin redirect blocked: {redirect_url}"
                 r = requests.post(redirect_url, data=body, headers=headers, timeout=300)
 
         r.raise_for_status()

@@ -17,6 +17,7 @@ from typing import Dict, Optional, Tuple
 
 import requests
 
+from .api_auth import apply_api_key_header
 from .api_key_cache import (
     API_KEY_CACHE,
     api_key_help_url,
@@ -105,9 +106,7 @@ def _get_json(session: requests.Session,
               verify: bool,
               api_key: Optional[str]) -> Tuple[Optional[Dict[str, object]], int]:
   url = base_url.rstrip("/") + "/" + path.lstrip("/")
-  headers = {}
-  if api_key:
-    headers["Authorization"] = f"Api-Key {api_key}"
+  headers = apply_api_key_header({}, api_key)
   try:
     resp = session.get(url, timeout=30, verify=verify, headers=headers)
   except requests.RequestException as exc:
