@@ -89,6 +89,28 @@ hpcperfstats-sacct-gen --api-key YOUR_KEY 2024-01-01 2024-01-02
 - Slurm `sacct` on the machine where the command runs.
 - Staff-capable API key for the ingest endpoint.
 
+## Python library usage
+
+`hpcperfstats-tools` also exposes reusable client helpers:
+
+```python
+from hpcperfstats_tools import ApiClient, get_job_full_dataframe
+
+client = ApiClient("https://stats.cluster.edu/api/", api_key="YOUR_KEY")
+home = client.get_json("home/")
+
+df = get_job_full_dataframe(
+    jid="12345",
+    api_url="https://stats.cluster.edu/api/",
+    api_key="YOUR_KEY",
+)
+print(df.head())
+```
+
+- `ApiClient` centralizes auth headers, JSON calls, and redirect-safe text POST.
+- `get_job_full_dataframe()` builds a pandas DataFrame for a job by fetching
+  job metadata and type-detail sample series over the REST API.
+
 ## License
 
 GNU Lesser General Public License v2.1 (LGPL-2.1), same as the main HPCPerfStats package. See [LICENSE](LICENSE).

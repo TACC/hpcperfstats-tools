@@ -22,6 +22,7 @@ classifiers = [
 dependencies = [
   "requests",
   "python-dateutil",
+  "pandas",
 ]
 
 [project.optional-dependencies]

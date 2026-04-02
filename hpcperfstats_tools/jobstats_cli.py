@@ -12,12 +12,9 @@ import argparse
 import os
 import sys
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Dict, Optional, Tuple
 
-import requests
-
-from .api_auth import apply_api_key_header
+from .api_client import ApiClient
 from .api_key_cache import (
     API_KEY_CACHE,
     api_key_help_url,
@@ -100,25 +97,23 @@ def _compute_metrics(job_data: Dict[str, object],
   }
 
 
-def _get_json(session: requests.Session,
+def _get_json(client: ApiClient,
               base_url: str,
               path: str,
               verify: bool,
               api_key: Optional[str]) -> Tuple[Optional[Dict[str, object]], int]:
+  result = client.get_json(path)
   url = base_url.rstrip("/") + "/" + path.lstrip("/")
-  headers = apply_api_key_header({}, api_key)
-  try:
-    resp = session.get(url, timeout=30, verify=verify, headers=headers)
-  except requests.RequestException as exc:
-    print(f"Failed to contact API at {url}: {exc}")
+  if result.status_code == 0:
+    print(f"Failed to contact API at {url}: {result.error}")
     return None, 0
-  if resp.status_code == 404:
-    return None, resp.status_code
-  if resp.status_code in (401, 403):
+  if result.status_code == 404:
+    return None, result.status_code
+  if result.status_code in (401, 403):
     help_url = api_key_help_url(base_url)
     print(
         "Authentication with the HPCPerfStats API failed "
-        f"({resp.status_code})."
+        f"({result.status_code})."
     )
     print(
         "Obtain an API key from:\n"
@@ -126,15 +121,14 @@ def _get_json(session: requests.Session,
         "Then run this command again with --api-key.\n"
         f"The key will be cached in {API_KEY_CACHE}."
     )
-    return None, resp.status_code
-  if not resp.ok:
-    print(f"API request failed ({resp.status_code}) for {url}: {resp.text}")
-    return None, resp.status_code
-  try:
-    return resp.json(), resp.status_code
-  except ValueError:
+    return None, result.status_code
+  if not result.ok:
+    print(f"API request failed ({result.status_code}) for {url}: {result.error}")
+    return None, result.status_code
+  if not isinstance(result.data, dict):
     print(f"API returned invalid JSON for {url}")
-    return None, resp.status_code
+    return None, result.status_code
+  return result.data, result.status_code
 
 
 def print_jobstats(jid: str,
@@ -142,10 +136,15 @@ def print_jobstats(jid: str,
                    verify_tls: bool,
                    api_key: Optional[str]) -> int:
   """Fetch job + metrics via REST API and print a jobstats-style summary."""
-  session = requests.Session()
+  client = ApiClient(
+      base_url=api_url,
+      api_key=api_key,
+      verify_tls=verify_tls,
+      timeout=30,
+  )
 
   detail, status = _get_json(
-      session, api_url, f"jobs/{jid}/", verify_tls, api_key
+      client, api_url, f"jobs/{jid}/", verify_tls, api_key
   )
   if detail is None:
     if status == 0:
@@ -158,7 +157,7 @@ def print_jobstats(jid: str,
   if api_key:
     save_cached_api_key(api_url, api_key)
 
-  home, _ = _get_json(session, api_url, "home/", verify_tls, api_key)
+  home, _ = _get_json(client, api_url, "home/", verify_tls, api_key)
   if home is None:
     home = {}
   hostname = home.get("machine_name", "-")
